@@ -47,6 +47,8 @@ public class ExtensibleDynamicObject extends MixInClosurePropertiesAsMethodsDyna
         BeforeConvention, AfterConvention
     }
 
+    private final Instantiator instantiator;
+    private final Object delegate;
     private final AbstractDynamicObject dynamicDelegate;
     private DynamicObject parent;
     private Convention convention;
@@ -55,19 +57,15 @@ public class ExtensibleDynamicObject extends MixInClosurePropertiesAsMethodsDyna
     private DynamicObject extraPropertiesDynamicObject;
 
     public ExtensibleDynamicObject(Object delegate, Class<?> publicType, Instantiator instantiator) {
-        this(delegate, createDynamicObject(delegate, publicType), new DefaultConvention(instantiator));
+        this(delegate, createDynamicObject(delegate, publicType), instantiator);
     }
 
     public ExtensibleDynamicObject(Object delegate, AbstractDynamicObject dynamicDelegate, Instantiator instantiator) {
-        this(delegate, dynamicDelegate, new DefaultConvention(instantiator));
-    }
-
-    public ExtensibleDynamicObject(Object delegate, AbstractDynamicObject dynamicDelegate, Convention convention) {
+        this.delegate = delegate;
         this.dynamicDelegate = dynamicDelegate;
-        this.convention = convention;
-        this.extraPropertiesDynamicObject = new ExtraPropertiesDynamicObjectAdapter(delegate.getClass(), convention.getExtraProperties());
-
-        updateDelegates();
+        this.instantiator = instantiator;
+        setObjects(dynamicDelegate);
+        setObjectsForUpdate(dynamicDelegate);
     }
 
     private static BeanDynamicObject createDynamicObject(Object delegate, Class<?> publicType) {
@@ -77,8 +75,10 @@ public class ExtensibleDynamicObject extends MixInClosurePropertiesAsMethodsDyna
     private void updateDelegates() {
         DynamicObject[] delegates = new DynamicObject[6];
         delegates[0] = dynamicDelegate;
-        delegates[1] = extraPropertiesDynamicObject;
-        int idx = 2;
+        int idx = 1;
+        if (extraPropertiesDynamicObject != null) {
+            delegates[idx++] = extraPropertiesDynamicObject;
+        }
         if (beforeConvention != null) {
             delegates[idx++] = beforeConvention;
         }
@@ -122,7 +122,7 @@ public class ExtensibleDynamicObject extends MixInClosurePropertiesAsMethodsDyna
     }
 
     public ExtraPropertiesExtension getDynamicProperties() {
-        return convention.getExtraProperties();
+        return getConvention().getExtraProperties();
     }
 
     public void addProperties(Map<String, ?> properties) {
@@ -141,6 +141,11 @@ public class ExtensibleDynamicObject extends MixInClosurePropertiesAsMethodsDyna
     }
 
     public Convention getConvention() {
+        if (convention == null) {
+            convention = new DefaultConvention(instantiator);
+            extraPropertiesDynamicObject = new ExtraPropertiesDynamicObjectAdapter(delegate.getClass(), convention.getExtraProperties());
+            updateDelegates();
+        }
         return convention;
     }
 
@@ -166,11 +171,15 @@ public class ExtensibleDynamicObject extends MixInClosurePropertiesAsMethodsDyna
 
     private DynamicObject snapshotInheritable() {
         final List<DynamicObject> delegates = new ArrayList<DynamicObject>(4);
-        delegates.add(extraPropertiesDynamicObject);
+        if (extraPropertiesDynamicObject != null) {
+            delegates.add(extraPropertiesDynamicObject);
+        }
         if (beforeConvention != null) {
             delegates.add(beforeConvention);
         }
-        delegates.add(convention.getExtensionsAsDynamicObject());
+        if (convention != null) {
+            delegates.add(convention.getExtensionsAsDynamicObject());
+        }
         if (parent != null) {
             delegates.add(parent);
         }
