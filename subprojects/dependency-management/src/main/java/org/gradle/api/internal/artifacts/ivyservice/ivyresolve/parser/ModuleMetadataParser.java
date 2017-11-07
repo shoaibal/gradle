@@ -22,14 +22,18 @@ import com.google.gson.stream.JsonToken;
 import org.gradle.api.Transformer;
 import org.gradle.api.artifacts.VersionConstraint;
 import org.gradle.api.attributes.Attribute;
+import org.gradle.api.attributes.Usage;
 import org.gradle.api.internal.artifacts.dependencies.DefaultImmutableVersionConstraint;
 import org.gradle.api.internal.artifacts.dependencies.DefaultMutableVersionConstraint;
 import org.gradle.api.internal.attributes.ImmutableAttributes;
 import org.gradle.api.internal.attributes.ImmutableAttributesFactory;
 import org.gradle.api.internal.changedetection.state.CoercingStringValueSnapshot;
+import org.gradle.api.internal.model.DefaultObjectFactory;
 import org.gradle.api.internal.model.NamedObjectInstantiator;
+import org.gradle.api.model.ObjectFactory;
 import org.gradle.internal.component.external.model.MutableComponentVariant;
 import org.gradle.internal.component.external.model.MutableComponentVariantResolveMetadata;
+import org.gradle.internal.reflect.DirectInstantiator;
 import org.gradle.internal.resource.local.LocallyAvailableExternalResource;
 
 import java.io.IOException;
@@ -45,6 +49,7 @@ public class ModuleMetadataParser {
     public static final String FORMAT_VERSION = "0.2";
     private final ImmutableAttributesFactory attributesFactory;
     private final NamedObjectInstantiator instantiator;
+    private final static ObjectFactory DEPRECATED_OBJECT_FACTORY = new DefaultObjectFactory(DirectInstantiator.INSTANCE, NamedObjectInstantiator.INSTANCE);
 
     public ModuleMetadataParser(ImmutableAttributesFactory attributesFactory, NamedObjectInstantiator instantiator) {
         this.attributesFactory = attributesFactory;
@@ -212,7 +217,10 @@ public class ModuleMetadataParser {
         reader.beginObject();
         while (reader.peek() != END_OBJECT) {
             String attrName = reader.nextName();
-            if (reader.peek() == BOOLEAN) {
+            if (attrName.equals(Usage.USAGE_ATTRIBUTE.getName())) {
+                String attrValue = reader.nextString();
+                attributes = attributesFactory.concat(attributes, Attribute.of(attrName, Usage.class), instantiator.named(Usage.class, attrValue));
+            } else if (reader.peek() == BOOLEAN) {
                 boolean attrValue = reader.nextBoolean();
                 attributes = attributesFactory.concat(attributes, Attribute.of(attrName, Boolean.class), attrValue);
             } else {
