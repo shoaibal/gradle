@@ -60,6 +60,8 @@ import org.gradle.internal.service.ServiceRegistry;
 import org.gradle.language.cpp.CppComponent;
 import org.gradle.language.cpp.plugins.CppExecutablePlugin;
 import org.gradle.language.cpp.plugins.CppLibraryPlugin;
+import org.gradle.language.swift.SwiftBinary;
+import org.gradle.language.swift.SwiftBundle;
 import org.gradle.language.swift.SwiftComponent;
 import org.gradle.language.swift.plugins.SwiftExecutablePlugin;
 import org.gradle.language.swift.plugins.SwiftLibraryPlugin;
@@ -205,16 +207,20 @@ public class XcodePlugin extends IdePlugin {
 
     private void configureXcodeForXCTest(final Project project, PBXTarget.ProductType productType) {
         SwiftXCTestSuite component = project.getExtensions().getByType(SwiftXCTestSuite.class);
-        FileCollection sources = component.getSwiftSource();
-        xcode.getProject().getGroups().getTests().from(sources);
 
-        // TODO - Reuse the logic from `swift-executable` or `swift-library` to determine the link task path
-        InstallXCTestBundle installXCTestBundle = (InstallXCTestBundle) project.getTasks().getByName("installTest");
+        SwiftBinary testSuiteBinary = component.getDevelopmentBinary();
+        if (testSuiteBinary instanceof SwiftBundle) {
+            FileCollection sources = component.getSwiftSource();
+            xcode.getProject().getGroups().getTests().from(sources);
 
-        String targetName = component.getModule().get() + " " + toString(productType);
-        XcodeTarget target = newTarget(targetName, component.getModule().get(), productType, toGradleCommand(project.getRootProject()), getBridgeTaskPath(project), installXCTestBundle.getBundleDirectory(), installXCTestBundle.getBundleDirectory(), sources);
-        target.getCompileModules().from(component.getDevelopmentBinary().getCompileModules());
-        xcode.getProject().addTarget(target);
+            // TODO - Reuse the logic from `swift-executable` or `swift-library` to determine the link task path
+            InstallXCTestBundle installXCTestBundle = (InstallXCTestBundle) project.getTasks().getByName("installTest");
+
+            String targetName = component.getModule().get() + " " + toString(productType);
+            XcodeTarget target = newTarget(targetName, component.getModule().get(), productType, toGradleCommand(project.getRootProject()), getBridgeTaskPath(project), installXCTestBundle.getBundleDirectory(), installXCTestBundle.getBundleDirectory(), sources);
+            target.getCompileModules().from(component.getDevelopmentBinary().getCompileModules());
+            xcode.getProject().addTarget(target);
+        }
     }
 
     private void configureXcodeForSwift(final Project project, PBXTarget.ProductType productType) {
